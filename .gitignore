@@ -1,0 +1,213 @@
+### MacOS template
+# General
+**/.DS_Store
+**/.AppleDouble
+**/.LSOverride
+
+# Directories potentially created on remote AFP share
+**/.AppleDB
+**/.AppleDesktop
+**/.apdisk
+**/deb_file
+### VisualStudioCode template
+**/.vscode/*
+**/*.code-workspace
+
+# Local History for Visual Studio Code
+**/.history/
+
+### Node template
+# Logs
+**/logs
+**/*.log
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/lerna-debug.log*
+
+
+# Runtime data
+**/pids
+**/*.pid
+**/*.seed
+**/*.pid.lock
+
+
+# Coverage directory used by tools like istanbul
+**/coverage
+**/*.lcov
+
+# nyc test coverage
+**/.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+**/.grunt
+
+# Bower dependency directory (https://bower.io/)
+**/bower_components
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+**/build/Release
+
+# Dependency directories
+**/node_modules/
+**/jspm_packages/
+
+# TypeScript cache
+**/*.tsbuildinfo
+
+# Optional npm cache directory
+**/.npm
+
+# Optional eslint cache
+**/.eslintcache
+
+# Microbundle cache
+**/.rpt2_cache/
+**/.rts2_cache_cjs/
+**/.rts2_cache_es/
+**/.rts2_cache_umd/
+
+# Output of 'npm pack'
+**/*.tgz
+
+# Gatsby files
+**/.cache/
+
+# vuepress build output
+**/.vuepress/dist
+
+# Stores VSCode versions used for testing VSCode extensions
+**/.vscode-test
+
+# yarn v2
+**/.yarn/cache
+**/.yarn/unplugged
+**/.yarn/build-state.yml
+**/.pnp.*
+
+
+
+# CMake
+**/cmake-build-*/
+
+
+# IntelliJ
+**/out/
+
+
+### Python template
+# Byte-compiled / optimized / DLL files
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+
+# Distribution / packaging
+**/.Python
+**/build/
+**/develop-eggs/
+**/dist/
+**/downloads/
+**/eggs/
+**/.eggs/
+**/lib64/
+**/parts/
+**/sdist/
+**/var/
+**/wheels/
+**/pip-wheel-metadata/
+**/share/python-wheels/
+**/*.egg-info/
+**/.installed.cfg
+**/*.egg
+**/MANIFEST
+
+
+# Installer logs
+**/pip-log.txt
+**/pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+**/htmlcov/
+**/.tox/
+**/.nox/
+**/.coverage
+**/.coverage.*
+**/.cache
+**/nosetests.xml
+**/coverage.xml
+**/*.cover
+**/*.py,cover
+**/.hypothesis/
+**/.pytest_cache/
+**/cover/
+
+# Translations
+**/*.mo
+**/*.pot
+
+# Django stuff:
+**/*.log
+**/*.log.*
+
+**/local_settings.py
+**/db.sqlite3
+**/db.sqlite3-journal
+
+# Flask stuff:
+**/instance/
+**/.webassets-cache
+
+# Sphinx documentation
+**/docs/_build/
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+**/__pypackages__/
+
+# Celery stuff
+**/celerybeat-schedule
+**/celerybeat.pid
+
+# Environments
+**/.env
+**/.venv
+**/env/
+**/venv/
+**/ENV/
+**/env.bak/
+**/venv.bak/
+
+# mypy
+**/.mypy_cache/
+
+# Pyre type checker
+**/.pyre/
+
+# pytype static type analyzer
+**/.pytype/
+
+# Cython debug symbols
+**/cython_debug/
+
+# Jetbrains project files
+**/.idea/
+**/.obsidian/
+**/.idea_modules/
+
+
+*.pyc
+*/*~
+volumes/
+cims_gate/static/
+py_ms/static/
+access_server/static/
+**/.clinic/
+
+**/.jetclient
+
+resources/
+
+# Ignore DevSpace cache and log folder
+**/.devspace/
+**/staticfiles/
+**/mediafiles/

@@ -1,0 +1,33 @@
+.frontend-rules: &frontend_rules
+  rules:
+    - changes:
+        - frontend/**/*
+        - .gitlab-ci.yml
+
+
+.backend-rules: &backend_rules
+  rules:
+    - changes:
+        - backend/**/*
+        - .gitlab-ci.yml
+
+include:
+  - component: git.kubit.dev/eitala/common/ci-cd/stages@main
+
+  - component: git.kubit.dev/eitala/common/ci-cd/rules@main
+
+  - component: git.kubit.dev/eitala/common/ci-cd/tag-build-deploy@main
+    inputs:
+      environment: frontend-dev
+      build_context: frontend
+      condition: .only_main
+      when: always
+    <<: *frontend_rules
+
+  - component: git.kubit.dev/eitala/common/ci-cd/tag-build-deploy@main
+    inputs:
+      environment: backend-dev
+      build_context: backend
+      condition: .only_main
+      when: always
+    <<: *backend_rules

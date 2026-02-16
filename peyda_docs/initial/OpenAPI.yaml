@@ -1,0 +1,1521 @@
+openapi: 3.0.3
+info:
+  title: سامانه پیدا - مدیریت گمشدگان مناسبتی
+  description: |
+    سامانه جامع مدیریت گمشدگان مناسبتی برای نیمه شعبان و سایر تجمعات انبوه.
+    این API امکان ثبت گزارش‌های گمشده و پیدا شده، جستجو و تطبیق هوشمند،
+    و مدیریت موکب‌ها را فراهم می‌کند.
+  version: 1.1.0
+  contact:
+    name: تیم توسعه سامانه پیدا
+    email: support@peyda.ir
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.peyda.ir/v1
+    description: سرور تولید
+  - url: https://staging-api.peyda.ir/v1
+    description: سرور تست
+
+paths:
+  # احراز هویت
+  /auth/send-otp:
+    post:
+      tags:
+        - احراز هویت
+      summary: ارسال کد یکبار مصرف
+      description: |
+        <div dir="rtl">
+        ارسال کد OTP به شماره موبایل کاربر از طریق پیام‌رسان‌های ایتا و واتساپ.
+        در صورت شکست یا اتمام زمان، کاربر باید شماره موبایل را مجددا وارد کند.
+        </div>
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - country_code
+              properties:
+                phone:
+                  type: string
+                  description: شماره موبایل کاربر
+                  example: "9123456789"
+                country_code:
+                  type: string
+                  description: کد کشور
+                  example: "+98"
+      responses:
+        '200':
+          description: کد OTP با موفقیت ارسال شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "کد تایید به شماره شما ارسال شد"
+                  request_id:
+                    type: string
+                    description: شناسه درخواست OTP برای استفاده در تایید و ارسال مجدد
+                    example: "req_1234567890"
+                  expires_in:
+                    type: integer
+                    description: زمان انقضای کد به ثانیه
+                    example: 300
+                  max_attempts:
+                    type: integer
+                    description: حداکثر تعداد تلاش‌های مجاز برای ورود کد
+                    example: 3
+                  max_resends:
+                    type: integer
+                    description: حداکثر تعداد ارسال مجدد کد
+                    example: 3
+        '400':
+          description: شماره موبایل نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_phone:
+                  value:
+                    status: 400
+                    code: "INVALID_PHONE"
+                    title: "شماره موبایل نامعتبر"
+                    message: "شماره موبایل وارد شده صحیح نیست."
+        '429':
+          description: درخواست‌های بیش از حد مجاز
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                too_many_requests:
+                  value:
+                    status: 429
+                    code: "TOO_MANY_REQUESTS"
+                    title: "درخواست‌های زیاد"
+                    message: "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً بعداً تلاش کنید."
+
+  /auth/verify-otp:
+    post:
+      tags:
+        - احراز هویت
+      summary: تایید کد یکبار مصرف و ورود
+      description: |
+        <div dir="rtl">
+        تایید کد OTP و دریافت توکن دسترسی.
+        کاربر تا ۳ بار فرصت ورود کد صحیح دارد.
+        </div>
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - otp
+                - request_id
+              properties:
+                otp:
+                  type: string
+                  description: کد یکبار مصرف
+                  example: "123456"
+                request_id:
+                  type: string
+                  description: شناسه درخواست OTP دریافتی از endpoint ارسال کد
+                  example: "req_1234567890"
+      responses:
+        '200':
+          description: ورود موفقیت‌آمیز
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  token:
+                    type: string
+                    description: توکن JWT برای احراز هویت
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: کد OTP نامعتبر یا منقضی شده
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_otp:
+                  value:
+                    status: 400
+                    code: "INVALID_OTP"
+                    title: "کد تایید نامعتبر"
+                    message: "کد تایید وارد شده صحیح نیست."
+                otp_expired:
+                  value:
+                    status: 400
+                    code: "OTP_EXPIRED"
+                    title: "کد تایید منقضی شده"
+                    message: "کد تایید وارد شده منقضی شده است. لطفاً مجدداً درخواست کد جدید بدهید."
+                invalid_request_id:
+                  value:
+                    status: 400
+                    code: "INVALID_REQUEST_ID"
+                    title: "شناسه درخواست نامعتبر"
+                    message: "شناسه درخواست OTP معتبر نیست."
+        '403':
+          description: تعداد تلاش‌های بیش از حد مجاز
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                max_attempts:
+                  value:
+                    status: 403
+                    code: "MAX_ATTEMPTS_REACHED"
+                    title: "حداکثر تلاش"
+                    message: "تعداد تلاش‌های شما برای ورود کد به حداکثر رسیده است. لطفاً کد جدید درخواست دهید."
+
+  /auth/resend-otp:
+    post:
+      tags:
+        - احراز هویت
+      summary: ارسال مجدد کد یکبار مصرف
+      description: |
+        <div dir="rtl">
+        ارسال مجدد کد OTP برای درخواست موجود.
+        فقط در صورتی امکان‌پذیر است که تعداد ارسال مجدد به حداکثر نرسیده باشد.
+        </div>
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - request_id
+              properties:
+                request_id:
+                  type: string
+                  description: شناسه درخواست OTP که می‌خواهید مجددا ارسال شود
+                  example: "req_1234567890"
+      responses:
+        '200':
+          description: کد OTP با موفقیت مجددا ارسال شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "کد تایید مجددا ارسال شد"
+                  request_id:
+                    type: string
+                    description: شناسه درخواست OTP (همان شناسه قبلی)
+                    example: "req_1234567890"
+                  expires_in:
+                    type: integer
+                    description: زمان انقضای کد جدید به ثانیه
+                    example: 300
+                  remaining_resends:
+                    type: integer
+                    description: تعداد باقی‌مانده ارسال مجدد
+                    example: 2
+        '400':
+          description: شناسه درخواست نامعتبر یا منقضی شده
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_request_id:
+                  value:
+                    status: 400
+                    code: "INVALID_REQUEST_ID"
+                    title: "شناسه درخواست نامعتبر"
+                    message: "شناسه درخواست OTP معتبر نیست یا منقضی شده است."
+        '429':
+          description: حداکثر تعداد ارسال مجدد استفاده شده است
+
+  # مدیریت مدیا
+  /media:
+    post:
+      tags:
+        - مدیا
+      summary: ایجاد آدرس آپلود مدیا
+      description: |
+        <div dir="rtl">
+        ایجاد یک آدرس آپلود پیش‌امضا شده (presigned URL) برای آپلود فایل تصویری.
+        این آدرس برای آپلود مستقیم فایل به S3 استفاده می‌شود.
+        </div>
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - filename
+                - content_type
+              properties:
+                filename:
+                  type: string
+                  description: نام فایل با پسوند
+                  example: "person_photo.jpg"
+                content_type:
+                  type: string
+                  description: نوع محتوای فایل (MIME type)
+                  example: "image/jpeg"
+                file_size:
+                  type: integer
+                  description: حجم فایل به بایت (اختیاری، برای اعتبارسنجی)
+                  example: 2048576
+      responses:
+        '201':
+          description: آدرس آپلود با موفقیت ایجاد شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  media_id:
+                    type: string
+                    description: شناسه یکتای مدیا برای استفاده در ثبت گزارش
+                    example: "media_1234567890"
+                  upload_url:
+                    type: string
+                    description: آدرس آپلود پیش‌امضا شده برای S3
+                    example: "https://peyda-uploads.s3.amazonaws.com/media_1234567890?..."
+                  expires_in:
+                    type: integer
+                    description: زمان انقضای آدرس آپلود به ثانیه
+                    example: 3600
+                  max_file_size:
+                    type: integer
+                    description: حداکثر حجم مجاز فایل به بایت
+                    example: 5242880
+        '400':
+          description: اطلاعات نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_file_type:
+                  value:
+                    status: 400
+                    code: "INVALID_FILE_TYPE"
+                    title: "نوع فایل نامعتبر"
+                    message: "فقط فایل‌های تصویری مجاز هستند."
+                file_too_large:
+                  value:
+                    status: 400
+                    code: "FILE_TOO_LARGE"
+                    title: "حجم فایل زیاد"
+                    message: "حجم فایل بیش از حد مجاز است (حداکثر 5 مگابایت)."
+        '401':
+          description: احراز هویت ناموفق
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /media/{mediaId}/verify:
+    post:
+      tags:
+        - مدیا
+      summary: تایید آپلود مدیا
+      description: |
+        <div dir="rtl">
+        تایید و اعتبارسنجی فایل آپلود شده.
+        پس از آپلود فایل به S3، این endpoint فراخوانی شود تا فایل اعتبارسنجی شود.
+        </div>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: mediaId
+          in: path
+          required: true
+          description: شناسه مدیا دریافتی از endpoint ایجاد مدیا
+          schema:
+            type: string
+      responses:
+        '200':
+          description: مدیا با موفقیت تایید شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  media_id:
+                    type: string
+                    description: شناسه مدیا تایید شده
+                    example: "media_1234567890"
+                  status:
+                    type: string
+                    enum: [verified, rejected]
+                    description: وضعیت نهایی مدیا
+                    example: "verified"
+                  file_info:
+                    type: object
+                    properties:
+                      size:
+                        type: integer
+                        description: حجم نهایی فایل به بایت
+                        example: 2048576
+                      width:
+                        type: integer
+                        description: عرض تصویر به پیکسل
+                        example: 1920
+                      height:
+                        type: integer
+                        description: ارتفاع تصویر به پیکسل
+                        example: 1080
+                      format:
+                        type: string
+                        description: فرمت تصویر
+                        example: "JPEG"
+        '400':
+          description: خطا در اعتبارسنجی فایل
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                file_not_found:
+                  value:
+                    status: 400
+                    code: "FILE_NOT_FOUND"
+                    title: "فایل یافت نشد"
+                    message: "فایل در S3 یافت نشد. لطفاً مجدداً آپلود کنید."
+                file_corrupted:
+                  value:
+                    status: 400
+                    code: "FILE_CORRUPTED"
+                    title: "فایل خراب"
+                    message: "فایل آپلود شده خراب یا نامعتبر است."
+                invalid_format:
+                  value:
+                    status: 400
+                    code: "INVALID_FORMAT"
+                    title: "فرمت نامعتبر"
+                    message: "فرمت فایل پشتیبانی نمی‌شود."
+        '404':
+          description: مدیا یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                media_not_found:
+                  value:
+                    status: 404
+                    code: "MEDIA_NOT_FOUND"
+                    title: "مدیا یافت نشد"
+                    message: "شناسه مدیا معتبر نیست."
+
+  # مدیریت موکب
+  /mawkab:
+    get:
+      tags:
+        - موکب‌ها
+      summary: دریافت اطلاعات موکب کاربر
+      description: |
+        <div dir="rtl">
+        دریافت اطلاعات موکب ثبت شده توسط کاربر.
+        اگر کاربر هنوز موکب ثبت نکرده باشد، وضعیت مناسب بازگردانده می‌شود.
+        </div>
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: اطلاعات موکب با موفقیت دریافت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  has_mawkab:
+                    type: boolean
+                    description: آیا کاربر موکب ثبت کرده است
+                    example: true
+                  mawkab:
+                    $ref: '#/components/schemas/Mawkab'
+                    description: اطلاعات کامل موکب (فقط در صورت وجود)
+        '401':
+          description: احراز هویت ناموفق
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  value:
+                    status: 401
+                    code: "UNAUTHORIZED"
+                    title: "عدم احراز هویت"
+                    message: "لطفاً وارد شوید."
+
+    post:
+      tags:
+        - موکب‌ها
+      summary: ثبت موکب جدید
+      description: |
+        <div dir="rtl">
+        ثبت اطلاعات موکب جدید به صورت چند مرحله‌ای.
+        پس از ثبت، موکب در وضعیت "در انتظار تایید" قرار می‌گیرد.
+        </div>
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MawkabRegistration'
+      responses:
+        '201':
+          description: موکب با موفقیت ثبت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "موکب شما با موفقیت ثبت شد و در انتظار تایید است"
+                  mawkab:
+                    $ref: '#/components/schemas/Mawkab'
+        '400':
+          description: اطلاعات نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_data:
+                  value:
+                    status: 400
+                    code: "INVALID_DATA"
+                    title: "اطلاعات نامعتبر"
+                    message: "اطلاعات وارد شده صحیح نیست."
+        '409':
+          description: کاربر قبلا موکب ثبت کرده است
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                mawkab_exists:
+                  value:
+                    status: 409
+                    code: "MAWKAB_ALREADY_EXISTS"
+                    title: "موکب تکراری"
+                    message: "شما قبلاً یک موکب ثبت کرده‌اید."
+
+    put:
+      tags:
+        - موکب‌ها
+      summary: ویرایش اطلاعات موکب
+      description: <div dir="rtl">ویرایش اطلاعات موکب ثبت شده</div>
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MawkabRegistration'
+      responses:
+        '200':
+          description: موکب با موفقیت ویرایش شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  mawkab:
+                    $ref: '#/components/schemas/Mawkab'
+        '400':
+          description: اطلاعات نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_data:
+                  value:
+                    status: 400
+                    code: "INVALID_DATA"
+                    title: "اطلاعات نامعتبر"
+                    message: "اطلاعات وارد شده صحیح نیست."
+        '404':
+          description: موکب یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                mawkab_not_found:
+                  value:
+                    status: 404
+                    code: "MAWKAB_NOT_FOUND"
+                    title: "موکب یافت نشد"
+                    message: "موکب مورد نظر یافت نشد."
+
+  # مدیریت گزارش‌ها
+  /reports:
+    get:
+      tags:
+        - گزارش‌ها
+      summary: دریافت لیست گزارش‌های کاربر
+      description: |
+        <div dir="rtl">
+        دریافت لیست تمام گزارش‌هایی که توسط کاربر ثبت شده است.
+        امکان جستجو و فیلتر بین گزارش‌های خود کاربر فراهم است.
+        </div>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          description: جستجو در نام و توضیحات
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: فیلتر بر اساس وضعیت. پیش‌فرض فرانت active و پیش‌فرض بکند همه
+          schema:
+            type: string
+            enum: [active, resolved, suspended]
+        - name: type
+          in: query
+          description: فیلتر بر اساس نوع گزارش
+          schema:
+            type: string
+            enum: [lost, found]
+        - name: gender
+          in: query
+          description: فیلتر بر اساس جنسیت
+          schema:
+            type: string
+            enum: [male, female]
+        - name: sort
+          in: query
+          description: مرتب‌سازی نتایج
+          schema:
+            type: string
+            enum: [newest, nearest]
+            default: newest
+        - name: my_reports_only
+          in: query
+          description: فقط گزارش‌های ثبت شده توسط کاربر (برای کاربران غیر موکب‌دار تایید شده همیشه true است)
+          schema:
+            type: boolean
+            default: false
+        - name: cursor
+          in: query
+          description: کرسر برای صفحه‌بندی (اسکرول بی‌نهایت)
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: تعداد آیتم در هر صفحه
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: لیست گزارش‌ها با موفقیت دریافت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Report'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                  total_matches:
+                    type: integer
+                    description: تعداد کل تطبیق‌های احتمالی
+                    example: 5
+        '401':
+          description: احراز هویت ناموفق
+
+    post:
+      tags:
+        - گزارش‌ها
+      summary: ثبت گزارش جدید (گمشده یا پیدا شده)
+      description: |
+        <div dir="rtl">
+        ثبت گزارش جدید برای فرد گمشده یا پیدا شده.
+        فرم به صورت مرحله‌ای با نوار پیشرفت طراحی شده است.
+        
+        پس از ثبت، سیستم به صورت خودکار گزارش را با گزارش‌های موجود سمت مخالف تطبیق می‌دهد
+        و لیست تطبیق‌های احتمالی را در همان لحظه برمی‌گرداند.
+        
+        در آینده نیز با ثبت گزارش‌های جدید سمت مخالف، تطبیق‌های جدیدی ممکن است ایجاد شوند
+        که از طریق نوتیفیکیشن به کاربر اطلاع‌رسانی خواهد شد.
+        </div>
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRegistration'
+      responses:
+        '201':
+          description: گزارش با موفقیت ثبت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "گزارش شما با موفقیت ثبت شد"
+                  tracking_code:
+                    type: string
+                    description: کد پیگیری گزارش
+                    example: "PYD-2024-12345"
+                  report:
+                    $ref: '#/components/schemas/Report'
+                  initial_matches:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Match'
+                    description: لیست تطبیق‌های فوری با گزارش‌های موجود سمت مخالف
+                    example:
+                      - id: "match_101"
+                        similarity_score: 85.5
+                        status: "pending"
+                        created_at: 1708023600
+        '400':
+          description: اطلاعات نامعتبر
+        '413':
+          description: حجم عکس بیش از حد مجاز
+
+  /reports/{reportId}:
+    get:
+      tags:
+        - گزارش‌ها
+      summary: دریافت جزئیات گزارش
+      description: |
+        <div dir="rtl">
+        دریافت جزئیات کامل گزارش به همراه لیست تطبیق‌های پیدا شده.
+        
+        این صفحه شامل:
+        - اطلاعات کامل گزارش درخواستی
+        - لیست تمام تطبیق‌های موجود با گزارش‌های سمت مخالف
+        - امکان مشاهده و اقدام در مورد هر تطبیق
+        
+        توجه: با ثبت گزارش‌های جدید سمت مخالف در آینده،
+        تطبیق‌های جدیدی ممکن است ایجاد شوند که از طریق نوتیفیکیشن اطلاع‌رسانی می‌شود.
+        </div>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          description: شناسه گزارش
+          schema:
+            type: string
+      responses:
+        '200':
+          description: اطلاعات گزارش با موفقیت دریافت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  report:
+                    $ref: '#/components/schemas/Report'
+                  matches:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Match'
+                    description: لیست تطبیق‌های پیشنهادی (گزارش‌های سمت مخالف)
+                    example:
+                      - id: "match_101"
+                        similarity_score: 85.5
+                        status: "pending"
+                        created_at: 1708023600
+        '404':
+          description: گزارش یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                report_not_found:
+                  value:
+                    status: 404
+                    code: "REPORT_NOT_FOUND"
+                    title: "گزارش یافت نشد"
+                    message: "گزارش مورد نظر یافت نشد."
+        '403':
+          description: دسترسی به گزارش ممکن نیست
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                report_access_denied:
+                  value:
+                    status: 403
+                    code: "REPORT_ACCESS_DENIED"
+                    title: "دسترسی به گزارش مجاز نیست"
+                    message: "فقط ثبت‌کننده گزارش می‌تواند اطلاعات آن را مشاهده کند."
+
+  # نکته: endpoint جستجوی جداگانه حذف شده و با /reports ادغام شده است
+  # کاربران می‌توانند از /reports با فیلترهای مختلف برای جستجو استفاده کنند
+
+  # مدیریت تطبیق‌ها
+  /matches/{matchId}:
+    get:
+      tags:
+        - تطبیق‌ها
+      summary: دریافت جزئیات تطبیق
+      description: |
+        <div dir="rtl">
+        دریافت اطلاعات کامل یک تطبیق خاص.
+        فقط برای کاربرانی که یکی از گزارش‌های مرتبط را ثبت کرده اند قابل دسترسی است.
+        شامل اطلاعات هر دو گزارش و تاریخچه اقدامات انجام شده.
+        </div>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: matchId
+          in: path
+          required: true
+          description: شناسه تطبیق
+          schema:
+            type: string
+      responses:
+        '200':
+          description: اطلاعات تطبیق با موفقیت دریافت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  match:
+                    $ref: '#/components/schemas/Match'
+                  fetcher_side:
+                    type: string
+                    enum: [lost_reporter, found_reporter]
+                    description: |
+                      سمت درخواست‌دهنده:
+                      - lost_reporter: کاربر گزارش گمشده را ثبت کرده است
+                      - found_reporter: کاربر گزارش پیدا شده را ثبت کرده است
+                    example: "lost_reporter"
+                  lost_report:
+                    $ref: '#/components/schemas/Report'
+                  found_report:
+                    $ref: '#/components/schemas/Report'
+                  similarity_score:
+                    type: number
+                    description: امتیاز شباهت (۰ تا ۱۰۰)
+                    example: 85.5
+        '404':
+          description: تطبیق یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                match_not_found:
+                  value:
+                    status: 404
+                    code: "MATCH_NOT_FOUND"
+                    title: "تطبیق یافت نشد"
+                    message: "تطبیق مورد نظر یافت نشد."
+        '403':
+          description: دسترسی به تطبیق ممکن نیست
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                access_denied:
+                  value:
+                    status: 403
+                    code: "MATCH_ACCESS_DENIED"
+                    title: "دسترسی به تطبیق مجاز نیست"
+                    message: "فقط ثبت‌کنندگان گزارش‌های مرتبط می‌توانند اطلاعات تطبیق را مشاهده کنند."
+
+    post:
+      tags:
+        - تطبیق‌ها
+      summary: اقدام در مورد تطبیق
+      description: |
+        <div dir="rtl">
+        ثبت اقدام در مورد تطبیق مانند تماس، در مسیر بودن، یا تایید نهایی.
+        این اقدامات به صورت خودکار به طرف مقابل اطلاع‌رسانی می‌شوند.
+        </div>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: matchId
+          in: path
+          required: true
+          description: شناسه تطبیق
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  $ref: '#/components/schemas/MatchActionType'
+                notes:
+                  type: string
+                  description: یادداشت‌های اختیاری
+                  example: "در حال حرکت به سمت موکب هستم"
+      responses:
+        '200':
+          description: اقدام با موفقیت ثبت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "اقدام شما با موفقیت ثبت و به طرف مقابل اطلاع‌رسانی شد"
+                  match:
+                    $ref: '#/components/schemas/Match'
+        '400':
+          description: اطلاعات نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_action:
+                  value:
+                    status: 400
+                    code: "INVALID_ACTION"
+                    title: "اقدام نامعتبر"
+                    message: "نوع اقدام وارد شده معتبر نیست."
+        '404':
+          description: تطبیق یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                match_not_found:
+                  value:
+                    status: 404
+                    code: "MATCH_NOT_FOUND"
+                    title: "تطبیق یافت نشد"
+                    message: "تطبیق مورد نظر یافت نشد."
+        '403':
+          description: دسترسی به اقدام ممکن نیست
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                action_access_denied:
+                  value:
+                    status: 403
+                    code: "ACTION_ACCESS_DENIED"
+                    title: "دسترسی به اقدام مجاز نیست"
+                    message: "فقط ثبت‌کنندگان گزارش‌های مرتبط می‌توانند در مورد تطبیق اقدام کنند."
+
+  # مدیریت وضعیت گزارش‌ها
+  /reports/{reportId}/status:
+    put:
+      tags:
+        - گزارش‌ها
+      summary: تغییر وضعیت گزارش
+      description: |
+        <div dir="rtl">
+        تغییر وضعیت گزارش مانند پیدا شدن خارج از اپلیکیشن یا انقضا.
+        فقط ثبت‌کننده گزارش می‌تواند وضعیت را تغییر دهد.
+        </div>
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          description: شناسه گزارش
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  $ref: '#/components/schemas/ReportStatus'
+                reason:
+                  type: string
+                  description: دلیل تغییر وضعیت
+                  example: "فرد خارج از اپلیکیشن پیدا شد"
+      responses:
+        '200':
+          description: وضعیت گزارش با موفقیت تغییر کرد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "وضعیت گزارش با موفقیت به مختومه تغییر کرد"
+                  report:
+                    $ref: '#/components/schemas/Report'
+        '400':
+          description: اطلاعات نامعتبر یا وضعیت نامجاز
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_status:
+                  value:
+                    status: 400
+                    code: "INVALID_STATUS"
+                    title: "وضعیت نامعتبر"
+                    message: "وضعیت جدید گزارش معتبر نیست."
+        '403':
+          description: دسترسی به تغییر وضعیت ممکن نیست
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                status_change_denied:
+                  value:
+                    status: 403
+                    code: "STATUS_CHANGE_DENIED"
+                    title: "دسترسی به تغییر وضعیت مجاز نیست"
+                    message: "فقط ثبت‌کننده گزارش می‌تواند وضعیت آن را تغییر دهد."
+        '404':
+          description: گزارش یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                report_not_found:
+                  value:
+                    status: 404
+                    code: "REPORT_NOT_FOUND"
+                    title: "گزارش یافت نشد"
+                    message: "گزارش مورد نظر یافت نشد."
+
+  # داشبورد و آمار
+  /dashboard/stats:
+    get:
+      tags:
+        - آمار
+      summary: دریافت آمار کلی سیستم
+      description: |
+        <div dir="rtl">
+        دریافت آمار زنده سیستم برای نمایش در صفحه اصلی.
+        این آمار شامل تعداد وصال‌های موفق و افراد پیدا شده است.
+        </div>
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: آمار با موفقیت دریافت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_reunions:
+                    type: integer
+                    description: تعداد کل وصال‌های موفق
+                    example: 1250
+                  total_found:
+                    type: integer
+                    description: تعداد کل افراد پیدا شده
+                    example: 890
+                  active_reports:
+                    type: integer
+                    description: تعداد گزارش‌های فعال
+                    example: 45
+                  success_rate:
+                    type: number
+                    description: درصد موفقیت پیدا شدن
+                    example: 78.5
+                  today_stats:
+                    type: object
+                    properties:
+                      reports_registered:
+                        type: integer
+                        example: 12
+                      people_found:
+                        type: integer
+                        example: 8
+                      reunions:
+                        type: integer
+                        example: 6
+        '401':
+          description: احراز هویت ناموفق
+
+  /mawkab/stats:
+    get:
+      tags:
+        - موکب‌ها
+      summary: دریافت آمار عملکرد موکب
+      description: |
+        <div dir="rtl">
+        دریافت آمار عملکرد موکب برای نمایش در صفحه موکب من.
+        فقط صاحب موکب می‌تواند این آمار را مشاهده کند.
+        </div>
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: آمار موکب با موفقیت دریافت شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_reports:
+                    type: integer
+                    description: تعداد کل گزارش‌های ثبت شده توسط این موکب
+                    example: 45
+                  resolved_reports:
+                    type: integer
+                    description: تعداد گزارش‌های حل‌شده
+                    example: 12
+        '401':
+          description: احراز هویت ناموفق
+        '404':
+          description: موکب یافت نشد
+
+tags:
+  - name: احراز هویت
+    description: عملیات ورود و تایید هویت کاربران
+  - name: موکب‌ها
+    description: مدیریت اطلاعات و وضعیت موکب‌ها
+  - name: گزارش‌ها
+    description: ثبت و مدیریت گزارش‌های گمشده و پیدا شده
+  - name: جستجو
+    description: جستجو و فیلتر گزارش‌ها
+  - name: تطبیق‌ها
+    description: مدیریت تطبیق‌های هوشمند بین گزارش‌ها
+  - name: آمار
+    description: دریافت آمار و اطلاعات داشبورد
+  - name: مدیا
+    description: آپلود و تایید فایل‌های تصویری
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: شناسه کاربر
+          example: "user_123"
+        phone:
+          type: string
+          description: شماره موبایل کاربر
+          example: "9123456789"
+        role:
+          type: string
+          enum: [user, mawkab_owner, admin]
+          description: نقش کاربر
+          example: "mawkab_owner"
+        is_verified:
+          type: boolean
+          description: آیا موکب کاربر تایید شده است
+          example: true
+        created_at:
+          type: integer
+          description: تاریخ ثبت‌نام کاربر (ثانیه از epoch)
+          example: 1708008600
+
+    Mawkab:
+      type: object
+      properties:
+        id:
+          type: string
+          description: شناسه موکب
+          example: "mawkab_456"
+        name:
+          type: string
+          description: نام موکب
+          example: "موکب امام حسین"
+        owner_name:
+          type: string
+          description: نام موکب‌دار
+          example: "حسین محمدی"
+        phone:
+          type: string
+          description: شماره تماس موکب
+          example: "9123456789"
+        address:
+          type: string
+          description: آدرس موکب
+          example: "بلوار امام خمینی، روبروی پارک شهر"
+        location:
+          $ref: '#/components/schemas/Location'
+        description:
+          type: string
+          description: توضیحات تکمیلی موکب
+          example: "ساعات فعالیت: ۸ صبح تا ۱۱ شب"
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+          description: وضعیت تایید موکب
+          example: "approved"
+        created_at:
+          type: integer
+          description: تاریخ ثبت موکب (ثانیه از epoch)
+          example: 1708008600
+
+    MawkabRegistration:
+      type: object
+      required:
+        - name
+        - owner_name
+        - phone
+        - location
+      properties:
+        name:
+          type: string
+          description: نام رسمی موکب
+          example: "موکب امام حسین"
+        owner_name:
+          type: string
+          description: نام و نام خانوادگی شخص مسئول
+          example: "حسین محمدی"
+        phone:
+          type: string
+          description: شماره موبایل موکب (قابل تغییر)
+          example: "9123456789"
+        address:
+          type: string
+          description: آدرس متنی و مشخصات شاخص
+          example: "شماره عمود ۱۲، روبروی مسجد جامع"
+        location:
+          $ref: '#/components/schemas/Location'
+        description:
+          type: string
+          description: توضیحات تکمیلی (ساعات فعالیت، خدمات ویژه)
+          example: "ساعات فعالیت: ۸ صبح تا ۱۱ شب، خدمات پذیرایی و پزشکی"
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+          description: شناسه گزارش
+          example: "report_789"
+        tracking_code:
+          type: string
+          description: کد پیگیری گزارش
+          example: "PYD-2024-12345"
+        type:
+          type: string
+          enum: [lost, found]
+          description: نوع گزارش
+          example: "lost"
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        person_name:
+          type: string
+          description: نام فرد (اختیاری)
+          example: "محمد رضایی"
+        age:
+          type: integer
+          description: سن حدودی
+          example: 25
+        gender:
+          type: string
+          enum: [male, female]
+          description: جنسیت
+          example: "male"
+        description:
+          type: string
+          description: توضیحات تکمیلی (رنگ لباس، تکیه‌کلام، لهجه)
+          example: "لباس قرمز، لهجه اصفهانی"
+        image_urls:
+          type: array
+          items:
+            type: string
+          description: آدرس عکس‌های فرد (۰ تا ۵ عکس)
+          example: ["https://cdn.peyda.ir/images/report_789_1.jpg", "https://cdn.peyda.ir/images/report_789_2.jpg"]
+        location:
+          $ref: '#/components/schemas/Location'
+        contact_phone:
+          type: string
+          description: شماره تماس ثبت‌کننده
+          example: "9123456789"
+        reporter_id:
+          type: string
+          description: شناسه ثبت‌کننده گزارش
+          example: "user_123"
+        match_count:
+          type: integer
+          description: تعداد تطبیق‌های احتمالی
+          example: 3
+        created_at:
+          type: integer
+          description: تاریخ ثبت گزارش (ثانیه از epoch)
+          example: 1708016400
+        updated_at:
+          type: integer
+          description: تاریخ آخرین به‌روزرسانی (ثانیه از epoch)
+          example: 1708023600
+
+    ReportRegistration:
+      type: object
+      required:
+        - type
+        - gender
+        - location
+        - contact_phone
+      properties:
+        type:
+          type: string
+          enum: [lost, found]
+          description: نوع گزارش
+          example: "lost"
+        person_name:
+          type: string
+          description: نام فرد (اختیاری)
+          example: "محمد رضایی"
+        age:
+          type: integer
+          description: سن حدودی
+          example: 25
+        gender:
+          type: string
+          enum: [male, female]
+          description: جنسیت
+          example: "male"
+        description:
+          type: string
+          description: توضیحات تکمیلی
+          example: "لباس قرمز، لهجه اصفهانی"
+        media_ids:
+          type: array
+          items:
+            type: string
+          description: لیست شناسه‌های مدیا تایید شده از endpoint مدیا (۰ تا ۵ عکس)
+          example: ["media_1234567890", "media_0987654321"]
+        location:
+          $ref: '#/components/schemas/Location'
+        contact_phone:
+          type: string
+          description: شماره تماس ثبت‌کننده (پیش‌فرض شماره کاربر)
+          example: "9123456789"
+
+    Match:
+      type: object
+      properties:
+        id:
+          type: string
+          description: شناسه تطبیق
+          example: "match_101"
+        lost_report:
+          $ref: '#/components/schemas/Report'
+        found_report:
+          $ref: '#/components/schemas/Report'
+        similarity_score:
+          type: number
+          description: امتیاز شباهت (۰ تا ۱۰۰)
+          example: 85.5
+        status:
+          $ref: '#/components/schemas/MatchStatus'
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchAction'
+          description: تاریخچه اقدامات انجام شده
+        created_at:
+          type: integer
+          description: تاریخ ایجاد تطبیق (ثانیه از epoch)
+          example: 1708023600
+
+    MatchAction:
+      type: object
+      properties:
+        id:
+          type: string
+          description: شناسه اقدام
+          example: "action_201"
+        action:
+          $ref: '#/components/schemas/MatchActionType'
+        user_id:
+          type: string
+          description: شناسه کاربر انجام‌دهنده اقدام
+          example: "user_123"
+        notes:
+          type: string
+          description: یادداشت‌های اقدام
+          example: "با شماره تماس گرفتم، فرد در موکب است"
+        created_at:
+          type: integer
+          description: تاریخ انجام اقدام (ثانیه از epoch)
+          example: 1708027200
+
+    Location:
+      type: object
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: number
+          description: عرض جغرافیایی
+          example: 35.6892
+        longitude:
+          type: number
+          description: طول جغرافیایی
+          example: 51.3890
+        address:
+          type: string
+          description: آدرس خودکار نقشه
+          example: "تهران، میدان امام خمینی"
+
+    Pagination:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          description: شماره صفحه فعلی
+          example: 1
+        total_pages:
+          type: integer
+          description: تعداد کل صفحات
+          example: 5
+        total_items:
+          type: integer
+          description: تعداد کل آیتم‌ها
+          example: 25
+        items_per_page:
+          type: integer
+          description: تعداد آیتم در هر صفحه
+          example: 5
+        has_next:
+          type: boolean
+          description: آیا صفحه بعدی وجود دارد
+          example: true
+        has_prev:
+          type: boolean
+          description: آیا صفحه قبلی وجود دارد
+          example: false
+
+    # شِمای یکپارچه وضعیت‌ها و اکشن‌ها
+    ReportStatus:
+      type: string
+      enum: [active, resolved, suspended]
+      description: |
+        وضعیت گزارش:
+        - active: گزارش فعال و در مچینگ شرکت می‌کند
+        - resolved: فرد پیدا شده و گزارش بسته شده
+        - suspended: ادمین گزارش را معلق کرده (در مچینگ شرکت نمی‌کند ولی در جستجو قابل مشاهده است)
+      example: "active"
+    
+    MatchStatus:
+      type: string
+      enum: [pending, rejected]
+      description: |
+        وضعیت تطبیق:
+        - pending: مچ ایجاد شده و منتظر اقدام است
+        - rejected: طرف گمشده مچ را رد کرده است (فقط ثبت‌کننده گزارش گمشده می‌تواند رد کند)
+      example: "pending"
+    
+    MatchActionType:
+      type: string
+      enum: [rejected]
+      description: |
+        نوع اقدام در مورد تطبیق:
+        - rejected: رد مچ (فقط ثبت‌کننده گزارش گمشده می‌تواند رد کند)
+      example: "rejected"
+
+    Error:
+      type: object
+      properties:
+        status:
+          type: integer
+          description: کد وضعیت HTTP
+          example: 400
+        code:
+          type: string
+          description: کد خطای یکتا برای برنامه
+          example: "OTP_EXPIRED"
+        title:
+          type: string
+          description: عنوان کوتاه خطا
+          example: "کد تایید منقضی شده"
+        message:
+          type: string
+          description: پیام کامل خطا برای کاربر
+          example: "کد تایید وارد شده منقضی شده است. لطفاً مجدداً درخواست کد جدید بدهید."

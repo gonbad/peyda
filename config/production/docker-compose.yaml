@@ -1,0 +1,175 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: peyda_db_prod
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - peyda
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: peyda_redis_prod
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    networks:
+      - peyda
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: peyda_rabbitmq_prod
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST:-/}
+    networks:
+      - peyda
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: peyda_api:prod
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: peyda_api_prod
+    command: uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --workers 4 --timeout 120
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASS=${RABBITMQ_PASS}
+      - SECRET_KEY=${SECRET_KEY}
+      - EITAA_BOT_TOKEN=${EITAA_BOT_TOKEN}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - BALE_BOT_TOKEN=${BALE_BOT_TOKEN}
+    networks:
+      - peyda
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  api-webhook:
+    image: peyda_api:prod
+    container_name: peyda_api_webhook_prod
+    command: uvicorn config.asgi:application --host 0.0.0.0 --port 8001 --workers 2 --timeout 120
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.webhook
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASS=${RABBITMQ_PASS}
+      - SECRET_KEY=${SECRET_KEY}
+    networks:
+      - peyda
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: peyda_frontend:prod
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${FRONTEND_API_URL}
+        VITE_ALLOWED_HOSTS: "true"
+    container_name: peyda_frontend_prod
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - peyda
+    restart: unless-stopped
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: peyda_n8n_prod
+    restart: unless-stopped
+    environment:
+      - NODE_FUNCTION_ALLOW_BUILTIN=crypto
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://yourdomain.com/
+      - GENERIC_TIMEZONE=Asia/Tehran
+      - WEBHOOK_API_URL=http://api-webhook:8001
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASS=${RABBITMQ_PASS}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - BALE_BOT_TOKEN=${BALE_BOT_TOKEN}
+      - EITAA_BOT_TOKEN=${EITAA_BOT_TOKEN}
+      - N8N_WEBHOOK_SECRET=${N8N_WEBHOOK_SECRET}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - peyda
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+networks:
+  peyda:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  n8n_data:
