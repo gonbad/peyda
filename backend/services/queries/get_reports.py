@@ -7,6 +7,7 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
 from .base import BaseQuery
+from services.media import MediaService
 
 
 @dataclass
@@ -108,6 +109,7 @@ class GetReportsQuery(BaseQuery[GetReportsResult]):
         ).count()
         
         # Build response
+        media_service = MediaService(cache=self._cache)
         reports = []
         for report in reports_list:
             # Count matches for this report
@@ -115,6 +117,11 @@ class GetReportsQuery(BaseQuery[GetReportsResult]):
                 Q(report_lost_id=report.id) | Q(report_found_id=report.id),
                 status=Match.Status.PENDING
             ).count()
+            
+            # Resolve image URLs to presigned URLs
+            image_urls = report.image_urls or []
+            if image_urls:
+                image_urls = media_service.resolve_media_urls(image_urls)
             
             reports.append({
                 'id': str(report.id),
@@ -124,7 +131,7 @@ class GetReportsQuery(BaseQuery[GetReportsResult]):
                 'age': report.age,
                 'gender': report.gender,
                 'description': report.description,
-                'image_urls': report.image_urls,
+                'image_urls': image_urls,
                 'location': {
                     'latitude': float(report.latitude),
                     'longitude': float(report.longitude),

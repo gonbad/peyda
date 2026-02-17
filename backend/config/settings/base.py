@@ -139,11 +139,11 @@ REDIS_URL = os.environ.get('REDIS_URL', f'redis://:{_redis_password}@{_redis_hos
 N8N_NOTIFICATION_WEBHOOK = os.environ.get('N8N_NOTIFICATION_WEBHOOK', '')
 
 # Peyda specific settings
-DAILY_REPORT_LIMIT = int(os.environ.get('DAILY_REPORT_LIMIT', 3))  # برای کاربران عادی
+DAILY_REPORT_LIMIT = int(os.environ.get('DAILY_REPORT_LIMIT', 6))  # برای کاربران عادی
 MATCH_DISPLAY_THRESHOLD = int(os.environ.get('MATCH_DISPLAY_THRESHOLD', 40))
 MATCH_NOTIFY_THRESHOLD = int(os.environ.get('MATCH_NOTIFY_THRESHOLD', 60))
-MAX_MATCHES_PER_REPORT = int(os.environ.get('MAX_MATCHES_PER_REPORT', 20))
-MAX_IMAGES_PER_REPORT = int(os.environ.get('MAX_IMAGES_PER_REPORT', 5))
+MAX_MATCHES_PER_REPORT = int(os.environ.get('MAX_MATCHES_PER_REPORT', 40))
+MAX_IMAGES_PER_REPORT = int(os.environ.get('MAX_IMAGES_PER_REPORT', 10))
 DEFAULT_LOCATION_LAT = float(os.environ.get('DEFAULT_LOCATION_LAT', 34.6416))  # بلوار پیامبر اعظم قم
 DEFAULT_LOCATION_LNG = float(os.environ.get('DEFAULT_LOCATION_LNG', 50.8746))
 
@@ -155,6 +155,27 @@ OTP_EXPIRY_SECONDS = int(os.environ.get('OTP_EXPIRY_SECONDS', 300))  # 5 minutes
 OTP_MAX_ATTEMPTS = int(os.environ.get('OTP_MAX_ATTEMPTS', 3))
 OTP_MAX_RESENDS = int(os.environ.get('OTP_MAX_RESENDS', 3))
 JWT_EXPIRY_DAYS = int(os.environ.get('JWT_EXPIRY_DAYS', 30))
+
+# OpenRouter API settings (for Gemini access)
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+OPENROUTER_API_URL = os.environ.get('OPENROUTER_API_URL', 'https://openrouter.ai/api/v1/chat/completions')
+SITE_URL = os.environ.get('SITE_URL', 'https://peyda.ir')
+
+# Hugging Face API settings (for transcription)
+HUGGINGFACE_API_KEY = os.environ.get('HUGGINGFACE_API_KEY', '')
+HUGGINGFACE_TRANSCRIPTION_MODEL = os.environ.get('HUGGINGFACE_TRANSCRIPTION_MODEL', 'openai/whisper-large-v3')
+
+# Transcription settings
+TRANSCRIPTION_DAILY_LIMIT = int(os.environ.get('TRANSCRIPTION_DAILY_LIMIT', 20))
+
+# S3/MinIO settings for media storage
+S3_ENDPOINT_URL = os.environ.get('S3_ENDPOINT_URL', 'http://localhost:9000')
+S3_EXTERNAL_URL = os.environ.get('S3_EXTERNAL_URL', 'http://localhost:9000')
+S3_ACCESS_KEY = os.environ.get('S3_ACCESS_KEY', 'peydaminio')
+S3_SECRET_KEY = os.environ.get('S3_SECRET_KEY', 'peydaminio123')
+S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME', 'peyda-media')
+S3_PRESIGNED_URL_EXPIRY = int(os.environ.get('S3_PRESIGNED_URL_EXPIRY', 3600))  # 1 hour
+MAX_UPLOAD_SIZE_BYTES = int(os.environ.get('MAX_UPLOAD_SIZE_BYTES', 5 * 1024 * 1024))  # 5MB
 
 # Sentry configuration
 SENTRY_DSN = os.environ.get('SENTRY_DSN', '')

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from .base import BaseQuery
+from services.media import MediaService
 
 
 @dataclass
@@ -14,6 +15,7 @@ class GetReportDetailResult:
     found: bool
     report: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    error_code: Optional[str] = None
 
 
 class GetReportDetailQuery(BaseQuery[GetReportDetailResult]):
@@ -44,6 +46,12 @@ class GetReportDetailQuery(BaseQuery[GetReportDetailResult]):
                 Q(report_found_id=report_id, report_lost__user_id=viewer_user_id)
             ).exists()
         
+        # Resolve image URLs to presigned URLs
+        image_urls = report.image_urls or []
+        if image_urls:
+            media_service = MediaService(cache=self._cache)
+            image_urls = media_service.resolve_media_urls(image_urls)
+        
         # Build response
         report_data = {
             'id': str(report.id),
@@ -53,7 +61,7 @@ class GetReportDetailQuery(BaseQuery[GetReportDetailResult]):
             'age': report.age,
             'gender': report.gender,
             'description': report.description,
-            'image_urls': report.image_urls,
+            'image_urls': image_urls,
             'latitude': float(report.latitude),
             'longitude': float(report.longitude),
             'address': report.address,

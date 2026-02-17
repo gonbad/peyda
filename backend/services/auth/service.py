@@ -64,7 +64,7 @@ class OTPAuthService:
     4. JWT token is returned
     """
     
-    OTP_LENGTH = 6
+    OTP_LENGTH = 4
     OTP_EXPIRY_SECONDS = 300  # 5 minutes
     MAX_ATTEMPTS = 3
     MAX_RESENDS = 3
@@ -104,6 +104,7 @@ class OTPAuthService:
         
         # Generate OTP and request_id
         otp = self._generate_otp()
+        logger.info(f"OTP generated for {full_phone}: {otp}")
         request_id = self._generate_request_id()
         
         # Store OTP data in cache

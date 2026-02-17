@@ -75,6 +75,14 @@ class Container:
         if cls == OTPAuthService:
             return OTPAuthService(cache=cache, event_bus=event_bus)
         
+        from services.transcription import TranscriptionService
+        if cls == TranscriptionService:
+            return TranscriptionService(cache=cache)
+        
+        from services.media import MediaService
+        if cls == MediaService:
+            return MediaService(cache=cache)
+        
         return cls(
             clock=clock,
             cache=cache,

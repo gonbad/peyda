@@ -12,6 +12,8 @@ from .viewsets import (
     MatchesViewSet,
     MawkabViewSet,
     DashboardViewSet,
+    TranscriptionViewSet,
+    MediaViewSet,
 )
 
 router = DefaultRouter()
@@ -32,6 +34,13 @@ urlpatterns = [
     
     # Dashboard stats
     path('dashboard/stats', DashboardViewSet.as_view({'get': 'list'}), name='dashboard-stats'),
+    
+    # Transcription endpoint (auth required)
+    path('transcription/audio-to-text', TranscriptionViewSet.as_view({'post': 'audio_to_text'}), name='transcription-audio-to-text'),
+    
+    # Media endpoints (auth required)
+    path('media', MediaViewSet.as_view({'post': 'create'}), name='media-create'),
+    path('media/<str:pk>/verify', MediaViewSet.as_view({'post': 'verify'}), name='media-verify'),
     
     # Router URLs (reports, matches)
     path('', include(router.urls)),

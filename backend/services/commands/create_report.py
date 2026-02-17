@@ -11,6 +11,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .base import BaseCommand
+from services.media import MediaService
 
 
 def _generate_tracking_code() -> str:
@@ -84,7 +85,7 @@ class CreateReportCommand(BaseCommand[CreateReportResult]):
             user.daily_report_count += 1
             user.save(update_fields=['daily_report_count', 'daily_report_date'])
         
-        # Convert media_ids to image_urls (media service handles this)
+        # Convert media_ids to object_keys (stored in DB, resolved to presigned URLs on read)
         image_urls = []
         if media_ids:
             max_images = getattr(settings, 'MAX_IMAGES_PER_REPORT', 5)
@@ -94,8 +95,14 @@ class CreateReportCommand(BaseCommand[CreateReportResult]):
                     error=f"حداکثر {max_images} تصویر مجاز است",
                     error_code="TOO_MANY_IMAGES"
                 )
-            # TODO: Convert media_ids to actual URLs via media service
-            image_urls = media_ids  # Placeholder
+            # Convert media_ids to object_keys via media service
+            media_service = MediaService(cache=self._cache)
+            for media_id in media_ids:
+                object_key = media_service.get_media_object_key(media_id)
+                if object_key:
+                    image_urls.append(object_key)
+                else:
+                    self.log_warning(f"Media {media_id} not found or not verified")
         
         # Generate tracking code
         tracking_code = _generate_tracking_code()

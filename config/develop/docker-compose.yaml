@@ -45,6 +45,75 @@ services:
       timeout: 5s
       retries: 5
 
+  minio:
+    image: minio/minio:latest
+    container_name: peyda_minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-peydaminio}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-peydaminio123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - peyda
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: peyda_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-peydaminio} $${MINIO_ROOT_PASSWORD:-peydaminio123};
+      mc mb --ignore-existing myminio/peyda-media;
+      mc anonymous set download myminio/peyda-media;
+      exit 0;
+      "
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-peydaminio}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-peydaminio123}
+    networks:
+      - peyda
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: peyda_metabase
+    restart: always
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_DBNAME=${DB_NAME:-peyda}
+      - MB_DB_USER=${DB_USER:-peyda}
+      - MB_DB_PASS=${DB_PASSWORD:-peyda}
+      - MB_DB_HOST=db
+      - MB_DB_PORT=5432
+      - MB_SITE_URL=http://localhost:3001
+      - MB_ADMIN_USER=${METABASE_USER:-admin@peyda.com}
+      - MB_ADMIN_PASSWORD=${METABASE_PASSWORD:-admin123}
+      - JAVA_TIMEZONE=Asia/Tehran
+    ports:
+      - "3001:3000"
+    networks:
+      - peyda
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   api:
     image: konkooria_backend
     build:
@@ -71,6 +140,11 @@ services:
       - RABBITMQ_PORT=5672
       - RABBITMQ_USER=${RABBITMQ_USER:-peyda}
       - RABBITMQ_PASS=${RABBITMQ_PASS:-peyda}
+      - S3_ENDPOINT_URL=http://minio:9000
+      - S3_EXTERNAL_URL=${S3_EXTERNAL_URL:-http://localhost:9000}
+      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-peydaminio}
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD:-peydaminio123}
+      - S3_BUCKET_NAME=peyda-media
     networks:
       - peyda
     depends_on:
@@ -79,6 +153,8 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   api-webhook:
@@ -146,6 +222,39 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+  waha:
+    restart: always
+    # https://waha.devlike.pro/docs/how-to/engines/#docker-images
+    # https://portal.devlike.pro/docker-image
+    image: docker.arvancloud.ir/devlikeapro/waha
+    # WAHA Core
+    # image: devlikeapro/waha:latest
+
+    # Add "dns" if you have a problem with resolving "web.whatsapp.com"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '10'
+
+    ports:
+      - '0.0.0.0:3000:3000/tcp'
+
+    volumes:
+      # Store sessions in the .sessions folder (comment it if you're using MongoDB)
+      - './sessions:/app/.sessions'
+
+      # Save media files
+      # https://waha.devlike.pro/docs/how-to/storages/#save-media-files-between-the-container-restarts
+      - './media:/app/.media'
+    networks:
+      - peyda
+    env_file:
+      - .env
 
   makemigrations:
     image: konkooria_backend
@@ -220,3 +329,4 @@ networks:
 
 volumes:
   postgres_data:
+  minio_data:

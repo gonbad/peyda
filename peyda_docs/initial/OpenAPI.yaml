@@ -14,10 +14,12 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: https://api.peyda.ir/v1
-    description: سرور تولید
-  - url: https://staging-api.peyda.ir/v1
-    description: سرور تست
+  - url: http://127.0.0.1:8060/api/v1/
+    description: local
+  - url: http://10.102.58.10:8060/api/v1/
+    description: lan
+  - url: http://91.107.246.1:8060/api/v1/
+    description: dev
 
 paths:
   # احراز هویت
@@ -1065,6 +1067,149 @@ paths:
                     title: "گزارش یافت نشد"
                     message: "گزارش مورد نظر یافت نشد."
 
+  # رونویسی صوت به متن
+  /transcription/audio-to-text:
+    post:
+      tags:
+        - رونویسی
+      summary: تبدیل صوت به متن ساختارمند
+      description: |
+        <div dir="rtl">
+        تبدیل فایل صوتی توضیحات فرد گمشده به متن ساختارمند و قابل جستجو.
+        این قابلیت برای کاربرانی که در استرس یا عجله هستند و نمی‌توانند متن بنویسند مناسب است.
+        
+        سیستم با استفاده از هوش مصنوعی (Gemini 2.5 Flash) صوت را تحلیل کرده و
+        مشخصات ظاهری فرد را به صورت مرتب و ساختارمند استخراج می‌کند.
+        </div>
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - audio
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: فایل صوتی (حداکثر ۱۰ مگابایت)
+      responses:
+        '200':
+          description: صوت با موفقیت به متن تبدیل شد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  text:
+                    type: string
+                    description: متن ساختارمند استخراج شده از صوت
+                    example: |
+                      **مشخصات ظاهری:**
+                      - رنگ مو: بور
+                      - رنگ چشم: سبز
+                      - رنگ پوست: سفید
+                      - قد: تقریبا ۱۷۰ سانتی‌متر
+                      
+                      **پوشاک:**
+                      - لباس بالاتنه: پیراهن سفید
+                      - لباس پایین‌تنه: شلوار مشکی
+                      - کفش: کتانی سفید
+                      
+                      **علائم خاص:**
+                      - خال کوچک روی گونه چپ
+                  remaining_requests:
+                    type: integer
+                    description: تعداد درخواست‌های باقی‌مانده امروز
+                    example: 9
+        '400':
+          description: خطا در پردازش فایل صوتی
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_audio:
+                  value:
+                    status: 400
+                    code: "MISSING_AUDIO"
+                    title: "فایل صوتی الزامی است"
+                    message: "لطفاً فایل صوتی را آپلود کنید."
+                file_too_large:
+                  value:
+                    status: 400
+                    code: "FILE_TOO_LARGE"
+                    title: "حجم فایل زیاد"
+                    message: "حجم فایل صوتی نباید بیشتر از ۱۰ مگابایت باشد."
+                invalid_format:
+                  value:
+                    status: 400
+                    code: "INVALID_FORMAT"
+                    title: "فرمت نامعتبر"
+                    message: "فرمت فایل صوتی پشتیبانی نمی‌شود. فرمت‌های مجاز: webm, mp3, wav, ogg, m4a"
+                empty_transcription:
+                  value:
+                    status: 400
+                    code: "EMPTY_TRANSCRIPTION"
+                    title: "متنی استخراج نشد"
+                    message: "متنی از صوت استخراج نشد. لطفاً صوت واضح‌تری ضبط کنید."
+                service_unavailable:
+                  value:
+                    status: 400
+                    code: "SERVICE_UNAVAILABLE"
+                    title: "سرویس در دسترس نیست"
+                    message: "سرویس رونویسی در دسترس نیست. لطفاً بعداً تلاش کنید."
+                timeout:
+                  value:
+                    status: 400
+                    code: "TIMEOUT"
+                    title: "زمان طول کشید"
+                    message: "زمان پردازش صوت بیش از حد طول کشید. لطفاً دوباره تلاش کنید."
+                api_error:
+                  value:
+                    status: 400
+                    code: "API_ERROR"
+                    title: "خطا در پردازش"
+                    message: "خطا در پردازش صوت. لطفاً دوباره تلاش کنید."
+                system_error:
+                  value:
+                    status: 400
+                    code: "SYSTEM_ERROR"
+                    title: "خطای سیستمی"
+                    message: "خطای سیستمی در پردازش صوت"
+        '401':
+          description: احراز هویت ناموفق
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  value:
+                    status: 401
+                    code: "UNAUTHORIZED"
+                    title: "عدم احراز هویت"
+                    message: "لطفاً وارد شوید."
+        '429':
+          description: بیش از حد مجاز درخواست
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                rate_limit_exceeded:
+                  value:
+                    status: 429
+                    code: "RATE_LIMIT_EXCEEDED"
+                    title: "محدودیت درخواست"
+                    message: "شما به حداکثر تعداد درخواست روزانه (۱۰ بار) رسیده‌اید. لطفاً فردا دوباره تلاش کنید."
+
   # داشبورد و آمار
   /dashboard/stats:
     get:
@@ -1165,6 +1310,8 @@ tags:
     description: دریافت آمار و اطلاعات داشبورد
   - name: مدیا
     description: آپلود و تایید فایل‌های تصویری
+  - name: رونویسی
+    description: تبدیل صوت به متن ساختارمند برای توضیحات افراد گمشده
 
 components:
   securitySchemes:

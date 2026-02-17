@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from .base import BaseQuery
+from services.media import MediaService
 
 
 @dataclass
@@ -45,6 +46,7 @@ class GetMatchesQuery(BaseQuery[GetMatchesResult]):
         
         queryset = queryset.order_by('-similarity_score', '-created_at')
         
+        media_service = MediaService(cache=self._cache)
         matches = []
         for match in queryset:
             # Determine which report is "other" (not user's)
@@ -54,6 +56,11 @@ class GetMatchesQuery(BaseQuery[GetMatchesResult]):
             else:
                 my_report = match.report_found
                 other_report = match.report_lost
+            
+            # Resolve image URLs to presigned URLs
+            other_image_urls = other_report.image_urls or []
+            if other_image_urls:
+                other_image_urls = media_service.resolve_media_urls(other_image_urls)
             
             matches.append({
                 'id': str(match.id),
@@ -71,7 +78,7 @@ class GetMatchesQuery(BaseQuery[GetMatchesResult]):
                     'report_type': other_report.report_type,
                     'age': other_report.age,
                     'gender': other_report.gender,
-                    'image_urls': other_report.image_urls,
+                    'image_urls': other_image_urls,
                     'latitude': float(other_report.latitude),
                     'longitude': float(other_report.longitude),
                     'contact_phone': other_report.contact_phone,  # Visible in match context
