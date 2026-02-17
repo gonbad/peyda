@@ -8,7 +8,8 @@ Based on OpenAPI.yaml:
 """
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.authentication import get_authorization_header
 
 from .base import BaseViewSet
 from services.auth import OTPAuthService
@@ -125,3 +126,38 @@ class AuthViewSet(BaseViewSet):
             'expires_in': result.expires_in,
             'remaining_resends': result.remaining_resends,
         })
+    
+    @action(detail=False, methods=['post'], url_path='logout', permission_classes=[IsAuthenticated])
+    def logout(self, request):
+        """
+        خروج کاربر و عدم اعتبار توکن
+        POST /auth/logout
+        """
+        # Extract token from Authorization header
+        auth_header = get_authorization_header(request).decode('utf-8')
+        
+        if not auth_header.startswith('Bearer '):
+            return self.error(
+                "توکن معتبر نیست",
+                "INVALID_TOKEN",
+                status.HTTP_401_UNAUTHORIZED
+            )
+        
+        token = auth_header[7:]  # Remove 'Bearer ' prefix
+        
+        container = get_container()
+        auth_service = container.get(OTPAuthService)
+        
+        success = auth_service.logout(token)
+        
+        if success:
+            return self.success({
+                'success': True,
+                'message': 'خروج با موفقیت انجام شد'
+            })
+        else:
+            return self.error(
+                "خطا در خروج",
+                "LOGOUT_FAILED",
+                status.HTTP_400_BAD_REQUEST
+            )

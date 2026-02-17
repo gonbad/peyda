@@ -29,6 +29,16 @@ class JWTAuthentication(authentication.BaseAuthentication):
         if not token:
             return None
         
+        # Check if token is blacklisted
+        from infrastructure.bootstrap import get_container
+        from services.auth import OTPAuthService
+        
+        container = get_container()
+        auth_service = container.get(OTPAuthService)
+        
+        if auth_service.is_token_blacklisted(token):
+            raise exceptions.AuthenticationFailed('توکن نامعتبر است')
+        
         try:
             payload = jwt.decode(
                 token,

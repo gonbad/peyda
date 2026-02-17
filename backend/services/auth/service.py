@@ -340,3 +340,65 @@ class OTPAuthService:
         
         secret = getattr(settings, 'SECRET_KEY', 'secret')
         return jwt.encode(payload, secret, algorithm='HS256')
+    
+    def logout(self, token: str) -> bool:
+        """
+        Logout user by blacklisting the token.
+        
+        Args:
+            token: JWT token to blacklist
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._cache:
+            return False
+        
+        try:
+            import jwt
+            from datetime import datetime, timedelta
+            
+            # Decode token to get expiration time
+            payload = jwt.decode(
+                token,
+                getattr(settings, 'SECRET_KEY', 'secret'),
+                algorithms=['HS256']
+            )
+            
+            exp = payload.get('exp')
+            if not exp:
+                return False
+            
+            # Calculate remaining time until expiration
+            now = datetime.utcnow()
+            exp_datetime = datetime.fromtimestamp(exp)
+            ttl = int((exp_datetime - now).total_seconds())
+            
+            if ttl <= 0:
+                return False  # Token already expired
+            
+            # Add token to blacklist
+            blacklist_key = f"blacklist:{hashlib.sha256(token.encode()).hexdigest()}"
+            self._cache.set_json(blacklist_key, True, ttl=ttl)
+            
+            logger.info(f"Token blacklisted for user {payload.get('user_id')}")
+            return True
+            
+        except jwt.InvalidTokenError:
+            return False
+    
+    def is_token_blacklisted(self, token: str) -> bool:
+        """
+        Check if token is blacklisted.
+        
+        Args:
+            token: JWT token to check
+            
+        Returns:
+            True if blacklisted, False otherwise
+        """
+        if not self._cache:
+            return False
+        
+        blacklist_key = f"blacklist:{hashlib.sha256(token.encode()).hexdigest()}"
+        return self._cache.get_json(blacklist_key) is not None
