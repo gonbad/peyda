@@ -77,3 +77,4 @@ boto3==1.40.35
 django-storages==1.14.6
 pytest==9.0.2
 pytest-django==4.11.1
+PyJWT==2.8.0

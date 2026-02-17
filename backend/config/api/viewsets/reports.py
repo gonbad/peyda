@@ -53,9 +53,21 @@ class ReportsViewSet(BaseViewSet):
         ثبت گزارش جدید
         POST /reports
         """
-        command = self.get_command(CreateReportCommand)
-        
+        # Validate required fields
+        report_type = request.data.get('type')
+        gender = request.data.get('gender')
         location = request.data.get('location', {})
+        
+        if not report_type:
+            return self.error("نوع گزارش الزامی است", "MISSING_TYPE", status.HTTP_400_BAD_REQUEST)
+        if report_type not in ('lost', 'found'):
+            return self.error("نوع گزارش باید lost یا found باشد", "INVALID_TYPE", status.HTTP_400_BAD_REQUEST)
+        if not gender:
+            return self.error("جنسیت الزامی است", "MISSING_GENDER", status.HTTP_400_BAD_REQUEST)
+        if not location.get('latitude') or not location.get('longitude'):
+            return self.error("موقعیت مکانی الزامی است", "MISSING_LOCATION", status.HTTP_400_BAD_REQUEST)
+        
+        command = self.get_command(CreateReportCommand)
         
         result = command.execute(
             user_id=request.user.id,

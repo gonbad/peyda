@@ -3,11 +3,9 @@ Base ViewSet for all API endpoints.
 """
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from pydantic import ValidationError
-from typing import Type, TypeVar, Optional, Tuple
+from typing import Type, TypeVar, Optional, Tuple, Dict, Any
 
 from infrastructure.bootstrap import get_container
-from config.api.contracts.base import ErrorResponse
 
 T = TypeVar('T')
 
@@ -19,7 +17,6 @@ class BaseViewSet(viewsets.ViewSet):
     Provides:
     - DI container access
     - Command/Query execution
-    - Pydantic validation
     - Standard error responses
     """
     
@@ -35,49 +32,15 @@ class BaseViewSet(viewsets.ViewSet):
         """Get a Query instance from the container."""
         return self.get_container().get(query_class)
     
-    def validate_request(
-        self, 
-        request_model: Type[T], 
-        data: dict
-    ) -> Tuple[Optional[T], Optional[Response]]:
-        """
-        Validate request data with Pydantic model.
-        
-        Returns:
-            Tuple of (validated_model, None) on success
-            Tuple of (None, error_response) on failure
-        """
-        try:
-            return request_model(**data), None
-        except ValidationError as e:
-            return None, self.validation_error(e)
-    
-    def validation_error(self, error: ValidationError) -> Response:
-        """Create validation error response."""
-        return Response(
-            ErrorResponse(
-                error="Validation Error",
-                code="VALIDATION_ERROR",
-                details={'errors': error.errors()}
-            ).model_dump(),
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    def success(self, data, response_model=None) -> Response:
+    def success(self, data: Dict[str, Any], status_code: int = 200) -> Response:
         """
         Create success response.
         
         Args:
-            data: Response data (dict or object)
-            response_model: Optional Pydantic model to validate response
+            data: Response data dict
+            status_code: HTTP status code (default 200)
         """
-        if response_model:
-            if hasattr(data, '__dict__') and not isinstance(data, dict):
-                validated = response_model.model_validate(data)
-            else:
-                validated = response_model(**data)
-            return Response(validated.model_dump())
-        return Response(data)
+        return Response(data, status=status_code)
     
     def error(
         self, 
@@ -87,14 +50,13 @@ class BaseViewSet(viewsets.ViewSet):
         details: dict = None
     ) -> Response:
         """Create error response."""
-        return Response(
-            ErrorResponse(
-                error=message, 
-                code=code,
-                details=details
-            ).model_dump(),
-            status=status_code
-        )
+        error_data = {
+            'error': message,
+            'code': code,
+        }
+        if details:
+            error_data['details'] = details
+        return Response(error_data, status=status_code)
     
     def not_found(self, message: str = "Not found") -> Response:
         """Create 404 response."""

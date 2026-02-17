@@ -88,3 +88,7 @@ class User(models.Model):
     def is_admin(self) -> bool:
         """آیا ادمین است"""
         return self.role == self.Role.ADMIN
+    
+    def get_display_name(self) -> str:
+        """نام نمایشی کاربر"""
+        return self.phone

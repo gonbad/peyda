@@ -274,6 +274,11 @@ class OTPAuthService:
         """Validate Iranian phone number."""
         if not phone:
             return False
+        # Remove country code prefix if present
+        if phone.startswith('+98'):
+            phone = phone[3:]
+        elif phone.startswith('98'):
+            phone = phone[2:]
         # Remove leading zeros
         phone = phone.lstrip('0')
         # Should be 10 digits starting with 9

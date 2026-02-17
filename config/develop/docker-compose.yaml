@@ -46,7 +46,7 @@ services:
       retries: 5
 
   api:
-    image: peyda_backend
+    image: konkooria_backend
     build:
       context: ../../backend
       dockerfile: Dockerfile
@@ -82,7 +82,7 @@ services:
         condition: service_healthy
 
   api-webhook:
-    image: peyda_backend
+    image: konkooria_backend
     build:
       context: ../../backend
       dockerfile: Dockerfile
@@ -148,7 +148,7 @@ services:
         condition: service_healthy
 
   makemigrations:
-    image: peyda_backend
+    image: konkooria_backend
     build:
       context: ../../backend
       dockerfile: Dockerfile
@@ -170,13 +170,35 @@ services:
       - tools
 
   migrate:
-    image: peyda_backend
+    image: konkooria_backend
     build:
       context: ../../backend
       dockerfile: Dockerfile
       target: development
     command: migrate
     entrypoint: python manage.py
+    volumes:
+      - ../../backend:/app
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - DB_HOST=db
+    networks:
+      - peyda
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - tools
+
+  test:
+    image: konkooria_backend
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      target: development
+    command: pytest
     volumes:
       - ../../backend:/app
     env_file:

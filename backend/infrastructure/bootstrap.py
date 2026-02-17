@@ -71,9 +71,9 @@ class Container:
         cache = self._singletons.get(Cache)
         event_bus = self._singletons.get(EventBus)
         
-        from services.auth.service import AuthService
-        if cls == AuthService:
-            return AuthService(event_bus=event_bus, clock=clock)
+        from services.auth.service import OTPAuthService
+        if cls == OTPAuthService:
+            return OTPAuthService(cache=cache, event_bus=event_bus)
         
         return cls(
             clock=clock,
