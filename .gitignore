@@ -198,6 +198,7 @@
 *.pyc
 */*~
 volumes/
+config/develop/sessions/
 cims_gate/static/
 py_ms/static/
 access_server/static/
